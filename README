@@ -1,0 +1,118 @@
+332CA Nemulescu Roxana-Elena
+
+Tema 4 - Planificarea de thread-uri
+
+Structuri folosite:
+	thread - pentru a descrie un thread:
+		tid - id-ul thread-ului
+		status - starea in care se gaseste thread-ul
+		events - numărul de evenimente suportate
+		priority - prioritatea
+		remaining_time - cuanta de timp
+		handler - handler
+		green - semaforul care ii spune thread-ului daca are
+				verde la rularea pe procesor (daca poate rula sau nu)
+	scheduler - decrierea unui planificator:
+		max_events - numarul maxim de evenimente
+		queue_size - dimensiunea cozii pentru thread-urile READY
+		num_threads - numarul de thread-uri aflate in executie
+		time_quantum - cuanta de timp
+		current_thread - thread-ul care ruleaza pe procesor
+		threads - lista cu thread-urile aflate in executie
+		ready_queue - coada cu prioritati (vector sortat crescator,
+					  in fucntie de prioritatea thread-urilor, astfel incat,
+					  pe ultima pozitie se va gasi thread-ul cu prioritate
+					  maxima).
+
+
+Implementarea functiilor din so_scheduler.h (so_scheduler.c):
+	Fiecare functie a fost implementata conform indicatiilor din enunt.
+	La inceputul fiecarei functii m-am asigurat ca argumentele au valori care
+	se incadreaza in limitele ce permit functionarea corecta.
+
+	so_init:
+		Pentru a evita dublarea initializarii unui planificator, am verificat
+		ca acesta sa fie NULL, pentru a putea continua initializarea.
+		In continuare, am alocat memorie pentru planificator, pentru vectorul in
+		care retin thread-urile aflate in executie si pentru coada cu prioritati
+		si am initializat restul campurilor din structura scheduler.
+	so_fork:
+		In functia so_fork, am alocat un nou thread, pe care l-am adaugat atat
+		in lista cu thread-uri, cat si in coada READY si am stabilit care
+		thread va rula in continuare pe procesor, cu ajutorul functiilor exec()
+		sau scheduler(). Functia exec() se apeleaza doar in cazul in care un
+		thread se afla pe procesor.
+	so_wait:
+		Am actualizat statusul thread-ului curent (WAITING), pentru a astepta
+		un eveniment sau o operatie I/O.
+	so_signal:
+		Am parcurs lista de thread-uri si am deblocat thread-urile care
+		asteptau evenimentul io, primit ca argument, schimband starea la READY,
+		si adaugand thread-ul in coada cu prioritati. In variabila
+		unlocked_threads, numar thread-urile deblocate, pentru a le returna
+		la finalul functiei.
+	so_exec:
+		Simuleaza timpul pe care un thread il petrece pe procesor, prin
+		decrementarea cuantei de timp, retinute in remaining_time.
+		Dupa ce un thread a stat o perioada de ceas pe procesor,
+		planificarea task-urilor se reia, prin apelul functiei reschedule().
+		Daca thread-ul curent, aflat in executie, a fost preemptat, acesta
+		se bloceaza, punand un wait pe semaforul corespunzator lui.
+	so_end:
+		Asteapta terminatrea tuturor thread-urilor, pentru a elibera memoria
+		alocata in functia so_init();
+
+Implementare functii ajutatoare (helper.h):
+	reschedule:
+		Aceasta functie planifica urmatorul thread care va rula pe procesor.
+		 *	Daca in coada cu prioritati nu exista niciun thread in starea
+		 	READY, planificatorul va lasa acelasi thread sa ruleze.
+		 *  Daca exista thread-uri gata sa ruleze, urmatorul thread care va rula
+		    va fi thread-ul care are cea mai mare prioritate, si anume,
+			ultimul thread din priority queue.
+		 *  Daca pe procesor nu ruleaza niciun thread sau thread-ul curent
+		    si-a terminat executia sau a fost preemptat, va veni urmatotul
+			thread pe procesor, care isi va incepe executia in urma
+			apelarii functiei start_thread, care determina contextul in care
+			va rula thread-ul.
+		 *  La expirarea cuantei de timp, conform algoritmului Round Robin,
+		    daca nu exista alt thread in starea READY sau un alt thread,
+			cu o prioritate mai mare decat a thread-ului curent,
+			acesta va rula in continuare.
+			Daca next si current au acceasi prioritate, se face switch intre
+			cele doua: next va rula pe procesor si current se va adauga in
+			coada READY (si i se va reseta cuanta de timp).
+			Algoritmul este prezentat in functia Round_Robin().
+	get_next_thread:
+		In acaeasta functie verific daca lista cu prioritati este vida:
+			 * daca in coada se gasesc elemente, il returnez pe ultimul;
+			 * daca nu sunt thread-uri care asteapta sa ruleze, se returneaza
+			   NULL.
+	switch_threads:
+		Functia switch_threads adauga thread-ul curent in coada READY,
+		reseteaza cuanta de timp a thread-ului preemptat si
+		pune thread-ul cu prioritate mai mare sa ruleze pe procesor.
+	start_thread:
+		In aceasta functie se elimina thread-ul cu prioritatea cea mai mare
+		din coada READY si se actualizeaza statusul la RUNNING.
+	insert_queue:
+		Functia insert_queue adauga thread-ul primit ca parametru la pozitia
+		specificata de argumentul pos si incrementeaza dimensiunea cozii.
+	get_position:
+		Cauta pozitia thread-ului care urmeaza sa fie adaugat, in functie de
+		prioritate; se parcurge coada, pana se gaseste un thread cu o
+		prioritate mai mare decat a thread-ului pe care dorim sa il inseram.
+	shift_queue:
+		Shifteaza coada cu o pozitie spre stanga,
+ 		incepand cu pozitia pos, pentru a face loc noului thread, ce urmeaza
+		sa fie adaugat.
+	thread_func:
+		La crearea unui nou thread, se va astepta pana cand thread-ul va fi
+		adus sa isi ruleze task-ul pe procesor, dupa care se va executa
+		handler-ul asociat thread-ului si se va	marca terminarea executiei,
+		in campul status. Functia se va	asigura ca planificatorul programeaza
+		in continuare thread-urile ramase, prin apelul functiei reschedule().
+	init_thread:
+		Aceasta functie se ocupa cu initializarea argumentelor unui thread
+		si cu lansarea thread-ului in executie.
+
